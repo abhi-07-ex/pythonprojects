@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Management System</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f4f6f9; color: #333; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { margin-bottom: 20px; color: #1e293b; text-align: center; }
+        h1{
+            background-color: #1fc922;
+        }
+        
+        /* Grid Layout */
+        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        @media(max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        
+        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .card h2 { margin-bottom: 15px; font-size: 1.2rem; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+
+        /* Form Controls */
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem;
+        }
+
+        /* Buttons & Filter Controls */
+        .btn { background: #2563eb; color: #fff; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; width: 100%; font-weight: 600; }
+        .btn:hover { background: #1d4ed8; }
+        .btn-danger { background: #ef4444; width: auto; padding: 4px 8px; font-size: 0.8rem; }
+        .btn-danger:hover { background: #dc2626; }
+
+        .toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .toolbar input, .toolbar select { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; flex: 1; }
+
+        /* Data Table */
+        .table-container { overflow-x: auto; max-height: 550px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+        th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+        th { background: #f8fafc; position: sticky; top: 0; color: #475569; font-weight: 700; }
+        tr:hover { background: #f1f5f9; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏢 IT Company Employee Dashboard</h1>
+
+    <div class="grid">
+        <!-- Employee Form -->
+        <div class="card">
+            <h2>Add / Update Employee</h2>
+            <form id="empForm">
+                <div class="form-group">
+                    <label>Emp ID (Leave empty to ADD new):</label>
+                    <input type="text" id="emp_id" placeholder="e.g. EMP1001 (For Update only)">
+                </div>
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" id="name" required placeholder="John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input type="text" id="dept" placeholder="IT, HR, Sales">
+                </div>
+                <div class="form-group">
+                    <label>Designation</label>
+                    <input type="text" id="designation" placeholder="Software Engineer">
+                </div>
+                <div class="form-group">
+                    <label>Qualification</label>
+                    <input type="text" id="qualification" placeholder="B.Tech, MBA">
+                </div>
+                <div class="form-group">
+                    <label>Previous Company</label>
+                    <input type="text" id="ex_company" placeholder="Ex-Company Name">
+                </div>
+                <div class="form-group">
+                    <label>Salary (INR)</label>
+                    <input type="number" id="salary" placeholder="50000">
+                </div>
+                <div class="form-group">
+                    <label>Date of Joining (DD/MM/YYYY)</label>
+                    <input type="text" id="doj" placeholder="15/01/2023">
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <textarea id="address" rows="2" placeholder="Full Address"></textarea>
+                </div>
+                <button type="submit" class="btn" id="submitBtn">Save Employee</button>
+            </form>
+        </div>
+
+        <!-- Employee Records Table -->
+        <div class="card">
+            <h2>Employee Records</h2>
+
+            <div class="toolbar">
+                <input type="text" id="searchInput" placeholder="Search by ID or Name..." onkeyup="filterTable()">
+                <select id="deptFilter" onchange="filterTable()">
+                    <option value="">All Departments</option>
+                </select>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Dept</th>
+                            <th>Designation</th>
+                            <th>Salary</th>
+                            <th>DOJ</th>
+                            <th>Working Days</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="empTableBody">
+                        <!-- Loaded via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let allEmployees = [];
+
+    // Load Data On Page Load
+    document.addEventListener("DOMContentLoaded", fetchEmployees);
+
+    async function fetchEmployees() {
+        const res = await fetch('/api/employees');
+        allEmployees = await res.json();
+        populateDepartmentFilter();
+        renderTable(allEmployees);
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('empTableBody');
+        tbody.innerHTML = '';
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No records found</td></tr>';
+            return;
+        }
+
+        data.forEach(emp => {
+            const row = `<tr>
+                <td><b>${emp.Emp_ID}</b></td>
+                <td>${emp.FullName}</td>
+                <td>${emp.Department}</td>
+                <td>${emp.Designation}</td>
+                <td>₹${emp.Salary}</td>
+                <td>${emp.DateOfJoining}</td>
+                <td>${emp.WorkingDays} days</td>
+                <td>
+                    <button class="btn btn-danger" onclick="deleteEmployee('${emp.Emp_ID}')">Delete</button>
+                </td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function populateDepartmentFilter() {
+        const deptFilter = document.getElementById('deptFilter');
+        const depts = [...new Set(allEmployees.map(e => e.Department).filter(Boolean))];
+        deptFilter.innerHTML = '<option value="">All Departments</option>';
+        depts.forEach(d => {
+            deptFilter.innerHTML += `<option value="${d}">${d}</option>`;
+        });
+    }
+
+    function filterTable() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const dept = document.getElementById('deptFilter').value;
+
+        const filtered = allEmployees.filter(emp => {
+            const matchesSearch = emp.Emp_ID.toLowerCase().includes(search) || emp.FullName.toLowerCase().includes(search);
+            const matchesDept = dept === "" || emp.Department === dept;
+            return matchesSearch && matchesDept;
+        });
+
+        renderTable(filtered);
+    }
+
+    // Form Submit (Add or Update)
+    document.getElementById('empForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const emp_id = document.getElementById('emp_id').value.trim();
+        const payload = {
+            Emp_ID: emp_id,
+            FullName: document.getElementById('name').value.trim(),
+            Department: document.getElementById('dept').value.trim(),
+            Designation: document.getElementById('designation').value.trim(),
+            Qualification: document.getElementById('qualification').value.trim(),
+            Ex_Company: document.getElementById('ex_company').value.trim(),
+            Salary: document.getElementById('salary').value,
+            DateOfJoining: document.getElementById('doj').value.trim(),
+            Address: document.getElementById('address').value.trim(),
+        };
+
+        const endpoint = emp_id ? '/api/update' : '/api/add';
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await res.json();
+        alert(result.message);
+        if (result.success) {
+            document.getElementById('empForm').reset();
+            fetchEmployees();
+        }
+    });
+
+    // Delete Employee
+    async function deleteEmployee(empId) {
+        if (!confirm(`Are you sure you want to delete ${empId}?`)) return;
+
+        const res = await fetch(`/api/delete/${empId}`, { method: 'DELETE' });
+        const result = await res.json();
+        alert(result.message);
+        if (result.success) fetchEmployees();
+    }
+</script>
+
+</body>
+</html>
